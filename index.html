@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>好玩的除法直式</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+            background-color: #F8FAFC;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .digit-box {
+            width: 3.2rem; height: 3.2rem;
+            font-size: 2rem; font-weight: 900;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 0.5rem; text-align: center; flex-shrink: 0;
+        }
+
+        .q-input, .r-input {
+            height: 3.2rem;
+            font-size: 2rem; font-weight: 900; text-align: center;
+            border: 3.5px solid #64748B; border-radius: 0.5rem;
+            background-color: #FFFFFF; color: #0F172A;
+            transition: all 0.2s ease; flex-shrink: 0;
+        }
+        .q-input { width: 3.2rem; }
+        .r-input { width: 5.5rem; }
+        .r-input::placeholder { color: #94A3B8; }
+
+        .q-input:focus, .r-input:focus {
+            border-color: #3B82F6; background-color: #EFF6FF; outline: none;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+        }
+        .q-input:disabled { background-color: #E2E8F0; border-color: #94A3B8; color: #94A3B8; cursor: not-allowed; }
+        .r-input:disabled { background-color: #FFFFFF; cursor: not-allowed; }
+
+        .invalid-state { border-color: #EF4444 !important; background-color: #FEE2E2 !important; color: #991B1B !important; }
+        .valid-state   { border-color: #22C55E !important; background-color: #DCFCE7 !important; color: #166534 !important; }
+
+        .tool-btn.active { box-shadow: 0 0 0 4px rgba(255,255,255,0.9), 0 0 0 7px var(--ring); }
+
+        @keyframes dropDown {
+            0%   { transform: translateY(-2.2rem); opacity: 0.1; }
+            60%  { transform: translateY(0.3rem);  opacity: 1; }
+            100% { transform: translateY(0);       opacity: 1; }
+        }
+        .animate-drop { animation: dropDown 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+        /* Cue on the dividend digit that is about to move down */
+        .drop-cue {
+            position: relative;
+            border-color: #F59E0B !important;
+            background-color: #FEF3C7 !important;
+            color: #B45309 !important;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.35);
+        }
+        .drop-cue::after {
+            content: '⬇';
+            position: absolute;
+            bottom: -1.9rem; left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.4rem;
+            color: #D97706;
+            animation: bob 0.8s ease-in-out infinite;
+        }
+        @keyframes bob {
+            0%, 100% { transform: translate(-50%, 0); }
+            50%      { transform: translate(-50%, 0.35rem); }
+        }
+        .fade-out { transition: opacity 0.5s ease; opacity: 0; }
+
+        /* 估商 highlight: dividend part and the tens digit of the estimate */
+        .est-hl {
+            background-color: #FCE7F3 !important;
+            color: #BE185D !important;
+            box-shadow: inset 0 0 0 3px #EC4899;
+        }
+        .est-hl-text {
+            color: #BE185D;
+            background-color: #FCE7F3;
+            box-shadow: inset 0 0 0 3px #EC4899;
+            border-radius: 0.4rem;
+            padding: 0 0.2rem;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .animate-drop, .drop-cue::after { animation: none; }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-100 p-3 sm:p-6 flex flex-col items-center">
+
+    <header class="w-full max-w-5xl bg-white rounded-3xl p-4 shadow-md border-4 border-slate-200 mb-4">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <span class="text-4xl">✏️</span>
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-800 tracking-wide">好玩的除法直式</h1>
+                <button onclick="openQR()" class="ml-1 flex items-center gap-1 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white px-3 py-2 rounded-xl font-black text-base shadow-md transition-all">
+                    <span class="text-xl">📱</span><span>QR Code</span>
+                </button>
+            </div>
+            <div class="flex flex-wrap justify-center gap-2 w-full md:w-auto">
+                <button onclick="switchMode('4div1')" id="btn-4div1" class="mode-btn px-4 py-2.5 rounded-2xl font-black text-lg border-4 transition-all bg-blue-500 text-white border-blue-600 shadow-md">4位數 ÷ 1位數</button>
+                <button onclick="switchMode('2div2')" id="btn-2div2" class="mode-btn px-4 py-2.5 rounded-2xl font-black text-lg border-4 transition-all bg-slate-200 text-slate-700 border-slate-300">2位數 ÷ 2位數</button>
+                <button onclick="switchMode('3div2')" id="btn-3div2" class="mode-btn px-4 py-2.5 rounded-2xl font-black text-lg border-4 transition-all bg-slate-200 text-slate-700 border-slate-300">3位數 ÷ 2位數</button>
+                <button onclick="switchMode('custom')" id="btn-custom" class="mode-btn px-4 py-2.5 rounded-2xl font-black text-lg border-4 transition-all bg-slate-200 text-slate-700 border-slate-300">✍️ 自己出題</button>
+            </div>
+        </div>
+
+        <!-- Custom problem (課本／習作題目) -->
+        <div id="custom-panel" class="hidden mt-4 bg-amber-50 border-4 border-amber-200 rounded-2xl p-3">
+            <div class="flex flex-wrap items-center justify-center gap-3">
+                <span class="text-xl font-black text-amber-900">輸入題目：</span>
+                <input id="custom-dividend" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="被除數"
+                       class="w-36 h-14 text-3xl font-black text-center border-4 border-slate-400 rounded-xl bg-white placeholder:text-lg placeholder:text-slate-400 focus:outline-none focus:border-blue-500">
+                <span class="text-4xl font-black text-slate-700">÷</span>
+                <input id="custom-divisor" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="除數"
+                       class="w-28 h-14 text-3xl font-black text-center border-4 border-slate-400 rounded-xl bg-white placeholder:text-lg placeholder:text-slate-400 focus:outline-none focus:border-blue-500">
+                <button onclick="startCustomProblem()" class="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white px-5 py-3 rounded-2xl font-black text-lg shadow-md transition-all">開始練習</button>
+            </div>
+            <div id="custom-msg" class="mt-2 text-center text-lg font-black text-red-600"></div>
+            <div class="mt-1 text-center text-base font-bold text-amber-800">被除數最多 4 位數，除數可輸入 2～99</div>
+        </div>
+    </header>
+
+    <main class="w-full max-w-5xl bg-white rounded-3xl p-4 sm:p-6 shadow-xl border-4 border-slate-200 flex flex-col items-center gap-5">
+
+        <!-- Toolbar -->
+        <div class="w-full flex flex-wrap items-center justify-between gap-3 bg-indigo-50 p-3 rounded-2xl border-2 border-indigo-100">
+            <button onclick="speakProblem()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-5 py-2.5 rounded-2xl font-black text-lg shadow-md transition-all">
+                <span class="text-2xl">🔊</span><span>唸題目</span>
+            </button>
+            <button onclick="showPanel('blocks')" id="btn-panel-blocks" style="--ring:#FCD34D" class="tool-btn flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white px-5 py-2.5 rounded-2xl font-black text-lg shadow-md transition-all">
+                <span class="text-2xl">💡</span><span>顯示積木提示</span>
+            </button>
+            <button onclick="showPanel('mult')" id="btn-panel-mult" style="--ring:#D8B4FE" class="tool-btn flex items-center gap-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white px-5 py-2.5 rounded-2xl font-black text-lg shadow-md transition-all">
+                <span class="text-2xl">✖️</span><span>乘法對照表</span>
+            </button>
+            <button onclick="generateNewProblem()" class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white px-5 py-2.5 rounded-2xl font-black text-lg shadow-md transition-all">
+                <span class="text-2xl">🎲</span><span>換下一題</span>
+            </button>
+        </div>
+
+        <!-- Problem -->
+        <div class="bg-amber-100 border-4 border-amber-300 px-8 py-3 rounded-3xl text-3xl sm:text-4xl font-black text-amber-900 shadow-inner" id="problem-text-display">? ÷ ? = ?</div>
+
+        <!-- Instruction bar -->
+        <div id="instruction-bar" class="w-full text-center text-xl sm:text-2xl font-black px-4 py-3 rounded-2xl border-4 transition-colors"></div>
+
+        <div class="w-full flex flex-col md:flex-row items-center md:items-start justify-center gap-6 sm:gap-8">
+
+            <!-- Vertical Division Board -->
+            <div class="bg-slate-50 p-6 sm:p-8 rounded-3xl border-4 border-slate-300 shadow-inner flex flex-col items-center min-w-[320px] overflow-x-auto max-w-full">
+                <div id="vertical-division-container" class="relative flex flex-col items-start gap-2"></div>
+
+                <!-- Final remainder -->
+                <div class="w-full border-t-2 border-dashed border-slate-300 mt-4 pt-3 flex items-center justify-end gap-3">
+                    <span class="text-xl font-black text-slate-600">最終餘數：</span>
+                    <input id="r-input" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="餘" class="r-input" disabled>
+                </div>
+
+                <div id="result-display" class="hidden mt-4 bg-green-100 border-4 border-green-400 text-green-900 px-6 py-3 rounded-2xl text-2xl sm:text-3xl font-black text-center"></div>
+            </div>
+
+            <!-- Side panel: multiplication table -->
+            <div id="panel-mult" class="w-full md:w-80 bg-purple-50 border-4 border-purple-200 rounded-3xl p-4 flex flex-col gap-2 shadow-sm">
+                <div class="flex items-center gap-2 border-b-2 border-purple-200 pb-2">
+                    <span class="text-2xl">✖️</span>
+                    <h3 class="text-xl font-black text-purple-900" id="mult-table-title">乘法對照表</h3>
+                </div>
+                <div class="grid grid-cols-1 gap-1.5 font-bold text-slate-800 text-lg" id="multiplication-list"></div>
+            </div>
+
+            <!-- Side panel: place-value blocks -->
+            <div id="panel-blocks" class="hidden w-full md:w-80 bg-amber-50 border-4 border-amber-200 rounded-3xl p-4 flex flex-col gap-3 shadow-sm">
+                <div class="flex items-center gap-2 border-b-2 border-amber-200 pb-2">
+                    <span class="text-2xl">🧩</span>
+                    <h3 class="text-xl font-black text-amber-900">數位積木 (被除數)</h3>
+                </div>
+                <div class="flex flex-col gap-3" id="blocks-list"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- QR Code modal -->
+    <div id="qr-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4" onclick="if (event.target === this) closeQR()">
+        <div class="bg-white rounded-3xl border-4 border-slate-200 shadow-2xl p-6 w-full max-w-sm flex flex-col items-center gap-4">
+            <h2 class="text-2xl font-black text-slate-800">📱 掃碼開始練習</h2>
+            <div id="qr-box" class="bg-white p-3 rounded-2xl border-4 border-slate-200"></div>
+            <label id="qr-include-row" class="flex items-center gap-2 text-lg font-black text-slate-700 cursor-pointer">
+                <input type="checkbox" id="qr-include" class="w-6 h-6 accent-amber-500" onchange="drawQR()">
+                <span id="qr-include-text">帶入目前題目</span>
+            </label>
+            <div id="qr-url" class="text-sm font-bold text-slate-500 break-all text-center"></div>
+            <div id="qr-warning" class="hidden text-base font-black text-red-600 bg-red-50 border-2 border-red-200 rounded-xl px-3 py-2 text-center"></div>
+            <button onclick="closeQR()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-6 py-2.5 rounded-2xl font-black text-lg">關閉</button>
+        </div>
+    </div>
+
+    <script>
+        const COL_W = 3.2;     // rem, one digit column
+        const GAP = 0.375;     // rem, gap-1.5
+
+        let currentMode = '4div1';
+        let currentPanel = 'mult';
+        let dividend = 0, divisor = 1, divDigits = [];
+        let startIndex = 0, finalRemainder = 0;
+        let stepTimers = {};
+
+        const INSTRUCTION_STYLES = {
+            info:    'bg-blue-50 border-blue-200 text-blue-900',
+            success: 'bg-green-50 border-green-300 text-green-800',
+            error:   'bg-red-50 border-red-300 text-red-700'
+        };
+
+        function setInstruction(text, tone = 'info') {
+            const bar = document.getElementById('instruction-bar');
+            bar.className = 'w-full text-center text-xl sm:text-2xl font-black px-4 py-3 rounded-2xl border-4 transition-colors ' + INSTRUCTION_STYLES[tone];
+            bar.innerText = text;
+        }
+
+        function leftWidthRem() { return divisor >= 10 ? 8.5 : 3.5; }
+
+        // 估商 state (2-digit divisors)
+        let needsEstimate = false;
+        let estimateBase = null;
+
+        function makeSpacer() {
+            const s = document.createElement('div');
+            s.style.width = `${leftWidthRem()}rem`;
+            s.style.flexShrink = '0';
+            return s;
+        }
+
+        function colOffsetRem(col) { return leftWidthRem() + GAP + col * (COL_W + GAP); }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-md');
+                btn.classList.add('bg-slate-200', 'text-slate-700', 'border-slate-300');
+            });
+            const a = document.getElementById(`btn-${mode}`);
+            a.classList.remove('bg-slate-200', 'text-slate-700', 'border-slate-300');
+            a.classList.add('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-md');
+            document.getElementById('custom-panel').classList.toggle('hidden', mode !== 'custom');
+            generateNewProblem();
+        }
+
+        // ===== 自己出題 =====
+        function startCustomProblem() {
+            const dEl = document.getElementById('custom-dividend');
+            const vEl = document.getElementById('custom-divisor');
+            const msg = document.getElementById('custom-msg');
+            const a = parseInt(dEl.value, 10);
+            const b = parseInt(vEl.value, 10);
+
+            if (isNaN(a) || isNaN(b)) { msg.innerText = '請輸入被除數和除數'; return; }
+            if (b < 2 || b > 99)      { msg.innerText = '除數請輸入 2～99'; vEl.focus(); return; }
+            if (a < b)                { msg.innerText = '被除數要比除數大（或一樣大）'; dEl.focus(); return; }
+
+            msg.innerText = '';
+            dividend = a;
+            divisor = b;
+            setupProblem();
+        }
+
+        ['custom-dividend', 'custom-divisor'].forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, ''); });
+            el.addEventListener('keydown', (e) => { if (e.key === 'Enter') startCustomProblem(); });
+        });
+
+        // ===== Side panel toggle (積木提示 / 乘法對照表) =====
+        function showPanel(name) {
+            const multOk = divisor < 10 || estimateBase !== null;   // 2位數除數：選好整十數後才出現
+            const multBtn = document.getElementById('btn-panel-mult');
+            multBtn.disabled = !multOk;
+            multBtn.classList.toggle('opacity-40', !multOk);
+            multBtn.classList.toggle('cursor-not-allowed', !multOk);
+            if (name === 'mult' && !multOk) {
+                currentPanel = 'mult';
+                document.getElementById('panel-mult').classList.add('hidden');
+                document.getElementById('panel-blocks').classList.add('hidden');
+                multBtn.classList.remove('active');
+                document.getElementById('btn-panel-blocks').classList.remove('active');
+                return;
+            }
+            currentPanel = name;
+            document.getElementById('panel-mult').classList.toggle('hidden', name !== 'mult');
+            document.getElementById('panel-blocks').classList.toggle('hidden', name !== 'blocks');
+            document.getElementById('btn-panel-mult').classList.toggle('active', name === 'mult');
+            document.getElementById('btn-panel-blocks').classList.toggle('active', name === 'blocks');
+        }
+
+        function speak(text, rate) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'zh-TW';
+                u.rate = rate || 0.85;
+                window.speechSynthesis.speak(u);
+            }
+        }
+
+        function speakProblem() { speak(`題目是：${dividend} 除以 ${divisor}`); }
+
+        function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        function generateNewProblem() {
+            Object.values(stepTimers).forEach(t => clearTimeout(t));
+            stepTimers = {};
+
+            if (currentMode === 'custom') {        // 自己出題：換下一題 = 清空輸入框，等老師輸入
+                document.getElementById('custom-dividend').value = '';
+                document.getElementById('custom-divisor').value = '';
+                document.getElementById('custom-msg').innerText = '';
+                document.getElementById('custom-dividend').focus();
+                return;
+            }
+
+            if (currentMode === '4div1') {
+                divisor = randInt(2, 9);
+                dividend = randInt(1000, 9999);
+            } else if (currentMode === '2div2') {
+                divisor = randInt(10, 49);
+                dividend = randInt(divisor, 99);
+            } else {
+                divisor = randInt(10, 49);
+                dividend = randInt(100, 999);
+            }
+            setupProblem();
+        }
+
+        function setupProblem() {
+            Object.values(stepTimers).forEach(t => clearTimeout(t));
+            stepTimers = {};
+            divDigits = dividend.toString().split('').map(Number);
+            document.getElementById('problem-text-display').innerText = `${dividend} ÷ ${divisor} = ?`;
+            hideResult();
+            resetRemainderInput();
+            setInstruction('請點選直式上方框框輸入商數 (A)');
+
+            renderMultiplicationTable();
+            renderBlocks();
+            renderVerticalForm();          // may switch the table to the tens digit (e.g. 20 → 2)
+            if (estimateBase === null || !needsEstimate) showPanel(currentPanel);
+        }
+
+        function renderVerticalForm() {
+            const container = document.getElementById('vertical-division-container');
+            container.innerHTML = '';
+            const divStr = dividend.toString();
+
+            startIndex = 0;
+            let v = 0;
+            for (let i = 0; i < divDigits.length; i++) {
+                v = v * 10 + divDigits[i];
+                if (v >= divisor) { startIndex = i; break; }
+            }
+
+            // Quotient row
+            const qRow = document.createElement('div');
+            qRow.className = 'flex items-center gap-1.5 border-b-4 border-slate-800 pb-1.5';
+            qRow.appendChild(makeSpacer());
+            for (let i = 0; i < divStr.length; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.inputMode = 'numeric';
+                input.autocomplete = 'off';
+                input.maxLength = 1;
+                input.id = `q-input-${i}`;
+                input.className = 'q-input';
+                if (i !== startIndex || divisor >= 10) input.disabled = true;
+                if (i < startIndex) input.style.visibility = 'hidden';
+                input.addEventListener('input', (e) => handleQuotientInput(e, i));
+                qRow.appendChild(input);
+            }
+            container.appendChild(qRow);
+
+            // Divisor ) dividend row
+            const mainRow = document.createElement('div');
+            mainRow.className = 'flex items-center gap-1.5 pt-1';
+            const left = document.createElement('div');
+            left.className = 'flex items-center justify-end';
+            left.style.width = `${leftWidthRem()}rem`;
+            left.style.flexShrink = '0';
+            left.innerHTML = `<span class="text-3xl font-black text-indigo-700 px-1">${divisor}</span><span class="text-4xl font-black text-slate-800">)</span>`;
+            mainRow.appendChild(left);
+            for (let i = 0; i < divStr.length; i++) {
+                const b = document.createElement('div');
+                b.className = 'digit-box bg-slate-200/70 border-2 border-slate-300 text-slate-800';
+                b.id = `top-digit-${i}`;
+                b.innerText = divStr[i];
+                mainRow.appendChild(b);
+            }
+            container.appendChild(mainRow);
+
+            // Steps
+            const steps = document.createElement('div');
+            steps.className = 'flex flex-col items-start gap-2 w-full pt-1';
+            container.appendChild(steps);
+            for (let i = startIndex; i < divStr.length; i++) {
+                const g = document.createElement('div');
+                g.id = `step-group-${i}`;
+                g.className = 'flex flex-col items-start w-full hidden';
+                steps.appendChild(g);
+            }
+
+            needsEstimate = divisor >= 10;
+            estimateBase = null;
+            if (needsEstimate) {
+                const panel = document.createElement('div');
+                panel.id = 'est-panel';
+                panel.className = 'absolute left-0 flex flex-col items-center gap-2 pr-2';
+                panel.style.width = `${leftWidthRem()}rem`;
+                panel.style.top = `${mainRow.offsetTop + mainRow.offsetHeight + 8}px`;
+                container.appendChild(panel);
+                renderEstimateChoices();
+            } else {
+                setTimeout(() => {
+                    const a = document.getElementById(`q-input-${startIndex}`);
+                    if (a) a.focus();
+                }, 100);
+            }
+        }
+
+        // ===== 估商 (estimate the divisor to the nearest ten) =====
+        function renderEstimateChoices() {
+            const panel = document.getElementById('est-panel');
+            if (divisor % 10 === 0) {          // already a whole ten
+                estimateBase = divisor;
+                afterEstimate();
+                return;
+            }
+            const low = Math.floor(divisor / 10) * 10;
+            const high = low + 10;
+            const correct = divisor % 10 >= 5 ? high : low;
+            setInstruction(`先幫除數 ${divisor} 找一個接近的整十數`);
+
+            panel.innerHTML = `
+                <div class="text-lg font-black text-slate-600 text-center leading-snug">${divisor} 接近哪一個？</div>
+                <div class="flex gap-2 justify-center" id="est-choices"></div>
+                <div id="est-msg" class="text-base font-black text-red-600 text-center leading-snug"></div>`;
+            const box = panel.querySelector('#est-choices');
+            [low, high].forEach(val => {
+                const btn = document.createElement('button');
+                btn.className = 'w-16 h-12 rounded-xl border-4 border-indigo-300 bg-white text-2xl font-black text-indigo-700 active:scale-95 transition-all';
+                btn.innerText = val;
+                btn.onclick = () => {
+                    if (val === correct) {
+                        estimateBase = val;
+                        afterEstimate();
+                    } else {
+                        btn.className = 'w-16 h-12 rounded-xl border-4 border-red-400 bg-red-50 text-2xl font-black text-red-600 transition-all';
+                        panel.querySelector('#est-msg').innerText = `${divisor} 離哪一個比較近？`;
+                    }
+                };
+                box.appendChild(btn);
+            });
+            updateContainerHeight();
+        }
+
+        function afterEstimate() {
+            const panel = document.getElementById('est-panel');
+            const tens = estimateBase / 10;
+            const label = estimateBase === divisor
+                ? `<span class="est-hl-text">${tens}</span>0`
+                : `${divisor} ≈ <span class="est-hl-text">${tens}</span>0`;
+            panel.innerHTML = `
+                <div class="text-2xl font-black text-slate-700 text-center whitespace-nowrap">${label}</div>`;
+            renderMultiplicationTable(tens);   // 40 → 4 的乘法, 20 → 2 的乘法
+            showPanel('mult');
+            const first = document.getElementById(`q-input-${startIndex}`);
+            first.disabled = false;
+            first.focus();
+            setInstruction('請點選直式上方框框輸入商數 (A)');
+            showEstimateForStep(startIndex);
+        }
+
+        // Cell that shows column `col` of the partial dividend for step `index`
+        function workingCell(index, col) {
+            return index === startIndex
+                ? document.getElementById(`top-digit-${col}`)
+                : document.getElementById(`diff-box-${index - 1}-${col}`);
+        }
+
+        function clearEstimateHighlights() {
+            document.querySelectorAll('.est-hl').forEach(el => el.classList.remove('est-hl'));
+        }
+
+        function hideEstimateHint() {
+            clearEstimateHighlights();
+            const hint = document.getElementById('est-hint');
+            if (hint) hint.classList.add('hidden');
+        }
+
+        function showEstimateForStep(index) {
+            if (!needsEstimate || estimateBase === null) return;
+            clearEstimateHighlights();
+            const panel = document.getElementById('est-panel');
+            const W = getWorkingDividendForStep(index);
+            const wStr = W.toString();
+            const firstCol = index - wStr.length + 1;
+
+            // Highlight only (no text): the part of the partial dividend to compare with the tens digit
+            const lastCol = W < divisor ? index : index - 1;
+            for (let c = firstCol; c <= lastCol; c++) workingCell(index, c)?.classList.add('est-hl');
+
+            // Move the panel next to the row being estimated
+            const mainRowCell = workingCell(index, firstCol);
+            const row = mainRowCell ? mainRowCell.parentElement : null;
+            if (row) {
+                panel.style.top = index === startIndex
+                    ? `${row.offsetTop + row.offsetHeight + 8}px`
+                    : `${row.offsetTop}px`;
+            }
+            updateContainerHeight();
+        }
+
+        function updateContainerHeight() {
+            const container = document.getElementById('vertical-division-container');
+            const panel = document.getElementById('est-panel');
+            container.style.minHeight = '';
+            if (panel) container.style.minHeight = `${panel.offsetTop + panel.offsetHeight + 8}px`;
+        }
+
+        function handleQuotientInput(event, index) {
+            const inputEl = event.target;
+            inputEl.value = inputEl.value.replace(/\D/g, '').slice(-1);
+            const stepGroup = document.getElementById(`step-group-${index}`);
+
+            if (stepTimers[index]) { clearTimeout(stepTimers[index]); delete stepTimers[index]; }
+            clearDropEffects();
+            hideResult();
+            resetRemainderInput();
+
+            if (inputEl.value === '') {
+                stepGroup.classList.add('hidden');
+                stepGroup.innerHTML = '';
+                inputEl.className = 'q-input';
+                lockFutureInputs(index);
+                setInstruction('請點選直式上方框框輸入商數 (A)');
+                showEstimateForStep(index);
+                return;
+            }
+
+            const valA = parseInt(inputEl.value, 10);
+            stepGroup.classList.remove('hidden');
+
+            const productB = valA * divisor;
+            const working = getWorkingDividendForStep(index);
+            const difference = working - productB;
+
+            let status = 'ok';
+            if (difference < 0) status = 'negative';
+            else if (difference >= divisor) status = 'tooLarge';
+
+            renderStep(index, productB, difference, status);
+            lockFutureInputs(index);
+
+            if (needsEstimate) {
+                if (status === 'ok') hideEstimateHint();
+                else showEstimateForStep(index);
+            }
+
+            if (status !== 'ok') {
+                inputEl.className = 'q-input invalid-state';
+                setInstruction('請修改紅色框框裡的商數 (A)');
+                return;
+            }
+
+            inputEl.className = 'q-input valid-state';
+
+            if (index < divDigits.length - 1) {
+                scheduleDrop(index, difference);
+            } else {
+                finalRemainder = difference;
+                enableRemainderInput();
+            }
+        }
+
+        function getWorkingDividendForStep(index) {
+            let v = 0;
+            for (let i = 0; i <= index; i++) {
+                v = v * 10 + divDigits[i];
+                if (i < index && i >= startIndex) {
+                    const q = parseInt(document.getElementById(`q-input-${i}`).value || '0', 10);
+                    v -= q * divisor;
+                }
+            }
+            return v;
+        }
+
+        function renderStep(index, productB, difference, status) {
+            const g = document.getElementById(`step-group-${index}`);
+            g.innerHTML = '';
+            const totalCols = divDigits.length;
+            const prodStr = productB.toString();
+
+            // Product row
+            const prodRow = document.createElement('div');
+            prodRow.className = 'flex items-center gap-1.5';
+            prodRow.appendChild(makeSpacer());
+            const prodStart = index - prodStr.length + 1;
+            for (let col = 0; col < totalCols; col++) {
+                const b = document.createElement('div');
+                b.className = status === 'negative' ? 'digit-box text-red-600' : 'digit-box text-purple-700';
+                const ci = col - prodStart;
+                b.innerText = (ci >= 0 && ci < prodStr.length) ? prodStr[ci] : '';
+                prodRow.appendChild(b);
+            }
+            g.appendChild(prodRow);
+
+            // Black line under this subtraction only
+            const workingStr = getWorkingDividendForStep(index).toString();
+            const lineStartCol = Math.max(0, Math.min(prodStart, index - workingStr.length + 1));
+            const n = totalCols - lineStartCol;   // extend to the ones column
+            const lineRow = document.createElement('div');
+            lineRow.className = 'my-1';
+            const line = document.createElement('div');
+            line.className = 'bg-slate-900 rounded-full h-1';
+            line.style.marginLeft = `${colOffsetRem(lineStartCol)}rem`;
+            line.style.width = `${n * COL_W + (n - 1) * GAP}rem`;
+            lineRow.appendChild(line);
+            g.appendChild(lineRow);
+
+            if (status === 'negative') {
+                g.appendChild(makeInlineHint(`${productB} 比 ${workingStr} 大，不夠減！<br>商要小一點`));
+                return;
+            }
+
+            // Difference row
+            const diffStr = difference.toString();
+            const diffRow = document.createElement('div');
+            diffRow.className = 'flex items-center gap-1.5';
+            diffRow.appendChild(makeSpacer());
+            for (let col = 0; col < totalCols; col++) {
+                const b = document.createElement('div');
+                b.className = status === 'tooLarge' ? 'digit-box text-red-600' : 'digit-box text-blue-800';
+                b.id = `diff-box-${index}-${col}`;
+                const ci = col - (index - diffStr.length + 1);
+                b.innerText = (ci >= 0 && ci < diffStr.length) ? diffStr[ci] : '';
+                diffRow.appendChild(b);
+            }
+            g.appendChild(diffRow);
+
+            if (status === 'tooLarge') {
+                const msg = difference === divisor
+                    ? `剩下的 ${difference} 和 ${divisor} 一樣大，<br>商還可以再大一點`
+                    : `剩下的 ${difference} 比 ${divisor} 大，<br>商還可以再大一點`;
+                g.appendChild(makeInlineHint(msg));
+            }
+        }
+
+        // Hint bubble shown right under the calculation it refers to
+        function makeInlineHint(html) {
+            const hint = document.createElement('div');
+            hint.className = 'w-full mt-1 bg-red-50 border-4 border-red-300 text-red-700 rounded-2xl px-3 py-2 text-lg sm:text-xl font-black text-center leading-snug';
+            hint.innerHTML = `<span class="text-2xl">👆</span> ${html}`;
+            return hint;
+        }
+
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        // Step 1: point at the digit that will move down.
+        // If the difference is 0: after 2 s the 0 fades away, then the digit moves down.
+        // Otherwise: after 3 s the digit moves down next to the difference.
+        function scheduleDrop(index, difference) {
+            const next = index + 1;
+            const src = document.getElementById(`top-digit-${next}`);
+            if (src) src.classList.add('drop-cue');
+            setInstruction(`答對了！${divDigits[next]} 要往下移囉`, 'success');
+
+            if (difference === 0) {
+                stepTimers[index] = setTimeout(() => {
+                    const zeroBox = document.getElementById(`diff-box-${index}-${index}`);
+                    if (zeroBox) zeroBox.classList.add('fade-out');
+                    stepTimers[index] = setTimeout(() => {
+                        if (zeroBox) { zeroBox.innerText = ''; zeroBox.classList.remove('fade-out'); }
+                        flyDigitDown(index);
+                    }, 600);
+                }, 2000);
+            } else {
+                stepTimers[index] = setTimeout(() => flyDigitDown(index), 3000);
+            }
+        }
+
+        // Step 2: the digit travels from the dividend row down to its place
+        function flyDigitDown(currentIndex) {
+            delete stepTimers[currentIndex];
+            const next = currentIndex + 1;
+            const digit = divDigits[next];
+            const container = document.getElementById('vertical-division-container');
+            const src = document.getElementById(`top-digit-${next}`);
+            const target = document.getElementById(`diff-box-${currentIndex}-${next}`);
+            if (!src || !target) return;
+
+            const c = container.getBoundingClientRect();
+            const s = src.getBoundingClientRect();
+            const t = target.getBoundingClientRect();
+
+            const fly = document.createElement('div');
+            fly.className = 'digit-box text-amber-600 flying-digit';
+            fly.style.position = 'absolute';
+            fly.style.left = `${s.left - c.left}px`;
+            fly.style.top = `${s.top - c.top}px`;
+            fly.style.zIndex = '10';
+            fly.innerText = digit;
+            container.appendChild(fly);
+
+            const anim = fly.animate(
+                [{ transform: 'translate(0, 0)' },
+                 { transform: `translate(${t.left - s.left}px, ${t.top - s.top}px)` }],
+                { duration: reduceMotion ? 0 : 1100, easing: 'ease-in-out', fill: 'forwards' }
+            );
+
+            anim.onfinish = () => {
+                fly.remove();
+                src.classList.remove('drop-cue');
+                if (!document.contains(target)) return;   // student changed the answer mid-way
+                target.innerText = digit;
+                target.classList.remove('text-blue-800');
+                target.classList.add('text-amber-600');
+                const nextInput = document.getElementById(`q-input-${next}`);
+                if (nextInput) {
+                    nextInput.disabled = false;
+                    nextInput.focus();
+                }
+                setInstruction('請輸入下一個商數 (A)');
+                showEstimateForStep(next);
+            };
+        }
+
+        function clearDropEffects() {
+            document.querySelectorAll('.drop-cue').forEach(el => el.classList.remove('drop-cue'));
+            document.querySelectorAll('.flying-digit').forEach(el => el.remove());
+        }
+
+        function lockFutureInputs(fromIndex) {
+            for (let i = fromIndex + 1; i < divDigits.length; i++) {
+                if (stepTimers[i]) { clearTimeout(stepTimers[i]); delete stepTimers[i]; }
+                const input = document.getElementById(`q-input-${i}`);
+                if (input) { input.value = ''; input.disabled = true; input.className = 'q-input'; }
+                const g = document.getElementById(`step-group-${i}`);
+                if (g) { g.classList.add('hidden'); g.innerHTML = ''; }
+            }
+        }
+
+        // ===== Final remainder =====
+        const rInput = document.getElementById('r-input');
+
+        function resetRemainderInput() {
+            rInput.value = '';
+            rInput.disabled = true;
+            rInput.className = 'r-input';
+        }
+
+        function enableRemainderInput() {
+            rInput.disabled = false;
+            rInput.focus();
+            setInstruction('商都填好了！請在下方輸入最終餘數。', 'success');
+        }
+
+        rInput.addEventListener('input', () => {
+            rInput.value = rInput.value.replace(/\D/g, '');
+            hideResult();
+            if (rInput.value === '') { rInput.className = 'r-input'; return; }
+            const val = parseInt(rInput.value, 10);
+            const maxLen = finalRemainder.toString().length;
+            if (val === finalRemainder) {
+                rInput.className = 'r-input valid-state';
+                showResult();
+            } else if (rInput.value.length >= maxLen) {
+                rInput.className = 'r-input invalid-state';
+                setInstruction('再看看直式最下面剩下的數字，那就是餘數。', 'error');
+            } else {
+                rInput.className = 'r-input';
+            }
+        });
+
+        function getQuotient() {
+            let s = '';
+            for (let i = startIndex; i < divDigits.length; i++) s += document.getElementById(`q-input-${i}`).value;
+            return parseInt(s, 10);
+        }
+
+        function showResult() {
+            const q = getQuotient();
+            const r = finalRemainder;
+            const el = document.getElementById('result-display');
+            if (r === 0) {
+                el.innerText = `🎉 ${dividend} ÷ ${divisor} = ${q}`;
+                speak(`太棒了，答對了！商是 ${q}，沒有餘數。`, 0.9);
+            } else {
+                el.innerText = `🎉 ${dividend} ÷ ${divisor} = ${q} 餘 ${r}`;
+                speak(`太棒了，答對了！商是 ${q}，餘數是 ${r}。`, 0.9);
+            }
+            el.classList.remove('hidden');
+            setInstruction('全部完成！按「換下一題」繼續挑戰。', 'success');
+        }
+
+        function hideResult() {
+            const el = document.getElementById('result-display');
+            el.classList.add('hidden');
+            el.innerText = '';
+        }
+
+        // ===== Multiplication table =====
+        function renderMultiplicationTable(n = divisor) {
+            const list = document.getElementById('multiplication-list');
+            document.getElementById('mult-table-title').innerText = `${n} 的乘法對照表`;
+            list.innerHTML = '';
+            for (let i = 1; i <= 9; i++) {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between bg-white px-4 py-2 rounded-xl border border-purple-200 shadow-sm';
+                row.innerHTML = `<span class="text-purple-900 font-bold">${n} × ${i}</span><span class="font-black text-indigo-600 text-xl">= ${n * i}</span>`;
+                list.appendChild(row);
+            }
+        }
+
+        // ===== Place-value blocks (數位積木) =====
+        const PLACES = [
+            { name: '個位（小小白）', make: () => '<div class="w-4 h-4 bg-amber-400 border-2 border-amber-600 rounded-sm"></div>' },
+            { name: '十位（長條）',   make: () => '<div class="w-3.5 h-9 bg-green-400 border-2 border-green-700 rounded"></div>' },
+            { name: '百位（方板）',   make: () => '<div class="w-8 h-8 bg-sky-400 border-2 border-sky-700 border-b-4 rounded flex items-center justify-center text-white text-xs font-black">百</div>' },
+            { name: '千位（大塊）',   make: () => '<div class="w-8 h-8 bg-indigo-400 border-2 border-indigo-700 border-b-4 border-r-4 rounded flex items-center justify-center text-white text-xs font-black">千</div>' }
+        ];
+
+        function renderBlocks() {
+            const list = document.getElementById('blocks-list');
+            list.innerHTML = '';
+            const len = divDigits.length;
+            for (let i = 0; i < len; i++) {
+                const place = PLACES[len - 1 - i];
+                const count = divDigits[i];
+                const card = document.createElement('div');
+                card.className = 'bg-white border-2 border-amber-200 rounded-2xl p-3 flex flex-col gap-2';
+                const blocks = count === 0
+                    ? '<span class="text-slate-400 font-bold">沒有</span>'
+                    : Array.from({ length: count }, place.make).join('');
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-black text-slate-700">${place.name}</span>
+                        <span class="font-black text-indigo-600">${count} 個</span>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-1.5">${blocks}</div>`;
+                list.appendChild(card);
+            }
+        }
+
+        // ===== QR Code =====
+        function pageBaseUrl() { return location.origin + location.pathname; }
+
+        function openQR() {
+            document.getElementById('qr-include').checked = currentMode === 'custom';
+            document.getElementById('qr-include-text').innerText = `帶入目前題目（${dividend} ÷ ${divisor}）`;
+            document.getElementById('qr-modal').classList.remove('hidden');
+            drawQR();
+        }
+
+        function closeQR() { document.getElementById('qr-modal').classList.add('hidden'); }
+
+        function drawQR() {
+            const include = document.getElementById('qr-include').checked;
+            const url = include ? `${pageBaseUrl()}?a=${dividend}&b=${divisor}` : pageBaseUrl();
+            const box = document.getElementById('qr-box');
+            const warn = document.getElementById('qr-warning');
+            box.innerHTML = '';
+            document.getElementById('qr-url').innerText = url;
+
+            if (location.protocol === 'file:') {
+                warn.innerText = '目前是從電腦開啟的檔案，學生掃了打不開。請上傳到 GitHub Pages 後，再從網址開啟並產生 QR Code。';
+                warn.classList.remove('hidden');
+            } else {
+                warn.classList.add('hidden');
+            }
+
+            if (typeof QRCode === 'undefined') {
+                box.innerHTML = '<div class="w-64 h-64 flex items-center justify-center text-slate-500 font-bold text-center">QR Code 載入失敗，請確認網路連線</div>';
+                return;
+            }
+            new QRCode(box, { text: url, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M });
+        }
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeQR(); });
+
+        // Open a shared problem from the URL, e.g. ?a=164&b=21
+        function loadProblemFromUrl() {
+            const params = new URLSearchParams(location.search);
+            const a = params.get('a'), b = params.get('b');
+            if (!a || !b || !/^\d{1,4}$/.test(a) || !/^\d{1,2}$/.test(b)) return false;
+            switchMode('custom');
+            document.getElementById('custom-dividend').value = a;
+            document.getElementById('custom-divisor').value = b;
+            startCustomProblem();
+            return true;
+        }
+
+        window.onload = () => {
+            showPanel('mult');
+            if (!loadProblemFromUrl()) generateNewProblem();
+        };
+    </script>
+</body>
+</html>
