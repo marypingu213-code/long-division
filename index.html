@@ -512,7 +512,8 @@
             const firstCol = index - wStr.length + 1;
 
             // Highlight only (no text): the part of the partial dividend to compare with the tens digit
-            const lastCol = W < divisor ? index : index - 1;
+            // Always leave out the ones digit (20 → only "2"; a single digit like 7 → nothing)
+            const lastCol = index - 1;
             for (let c = firstCol; c <= lastCol; c++) workingCell(index, c)?.classList.add('est-hl');
 
             // Move the panel next to the row being estimated
