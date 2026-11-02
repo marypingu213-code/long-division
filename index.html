@@ -227,6 +227,11 @@
             bar.innerText = text;
         }
 
+        // 引導語：「8 裡面有幾個 3？（商寫在上面）」
+        function askQuotient(index) {
+            setInstruction(`${getWorkingDividendForStep(index)} 裡面有幾個 ${divisor}？（商寫在上面）`);
+        }
+
         function leftWidthRem() { return divisor >= 10 ? 8.5 : 3.5; }
 
         // 估商 state (2-digit divisors)
@@ -347,11 +352,10 @@
             document.getElementById('problem-text-display').innerText = `${dividend} ÷ ${divisor} = ?`;
             hideResult();
             resetRemainderInput();
-            setInstruction('請點選直式上方框框輸入商數 (A)');
-
             renderMultiplicationTable();
             renderBlocks();
             renderVerticalForm();          // may switch the table to the tens digit (e.g. 20 → 2)
+            if (!needsEstimate || estimateBase !== null) askQuotient(startIndex);
             if (estimateBase === null || !needsEstimate) showPanel(currentPanel);
         }
 
@@ -482,7 +486,7 @@
             const first = document.getElementById(`q-input-${startIndex}`);
             first.disabled = false;
             first.focus();
-            setInstruction('請點選直式上方框框輸入商數 (A)');
+            askQuotient(startIndex);
             showEstimateForStep(startIndex);
         }
 
@@ -549,7 +553,7 @@
                 stepGroup.innerHTML = '';
                 inputEl.className = 'q-input';
                 lockFutureInputs(index);
-                setInstruction('請點選直式上方框框輸入商數 (A)');
+                askQuotient(index);
                 showEstimateForStep(index);
                 return;
             }
@@ -728,15 +732,13 @@
                 fly.remove();
                 src.classList.remove('drop-cue');
                 if (!document.contains(target)) return;   // student changed the answer mid-way
-                target.innerText = digit;
-                target.classList.remove('text-blue-800');
-                target.classList.add('text-amber-600');
+                target.innerText = digit;   // 和上面的差同顏色，看起來是同一個數
                 const nextInput = document.getElementById(`q-input-${next}`);
                 if (nextInput) {
                     nextInput.disabled = false;
                     nextInput.focus();
                 }
-                setInstruction('請輸入下一個商數 (A)');
+                askQuotient(next);
                 showEstimateForStep(next);
             };
         }
