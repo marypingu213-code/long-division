@@ -227,18 +227,6 @@
             bar.innerText = text;
         }
 
-        // 引導語：「8 裡面有幾個 3？（商寫在上面）」
-        // 2位數除數估商後：配合粉紅色標示和乘法表，問「被除數去掉個位 裡面有幾個 整十數的十位」
-        // 例：398 ÷ 29，29 ≈ 30 → 「3 裡面有幾個 3？」
-        function askQuotient(index) {
-            const W = getWorkingDividendForStep(index);
-            if (needsEstimate && estimateBase !== null && W >= 10) {
-                setInstruction(`${Math.floor(W / 10)} 裡面有幾個 ${estimateBase / 10}？（商寫在上面）`);
-            } else {
-                setInstruction(`${W} 裡面有幾個 ${divisor}？（商寫在上面）`);
-            }
-        }
-
         function leftWidthRem() { return divisor >= 10 ? 8.5 : 3.5; }
 
         // 估商 state (2-digit divisors)
@@ -359,10 +347,11 @@
             document.getElementById('problem-text-display').innerText = `${dividend} ÷ ${divisor} = ?`;
             hideResult();
             resetRemainderInput();
+            setInstruction('請點選直式上方框框輸入商數 (A)');
+
             renderMultiplicationTable();
             renderBlocks();
             renderVerticalForm();          // may switch the table to the tens digit (e.g. 20 → 2)
-            if (!needsEstimate || estimateBase !== null) askQuotient(startIndex);
             if (estimateBase === null || !needsEstimate) showPanel(currentPanel);
         }
 
@@ -493,7 +482,7 @@
             const first = document.getElementById(`q-input-${startIndex}`);
             first.disabled = false;
             first.focus();
-            askQuotient(startIndex);
+            setInstruction('請點選直式上方框框輸入商數 (A)');
             showEstimateForStep(startIndex);
         }
 
@@ -560,7 +549,7 @@
                 stepGroup.innerHTML = '';
                 inputEl.className = 'q-input';
                 lockFutureInputs(index);
-                askQuotient(index);
+                setInstruction('請點選直式上方框框輸入商數 (A)');
                 showEstimateForStep(index);
                 return;
             }
@@ -745,7 +734,7 @@
                     nextInput.disabled = false;
                     nextInput.focus();
                 }
-                askQuotient(next);
+                setInstruction('請輸入下一個商數 (A)');
                 showEstimateForStep(next);
             };
         }
