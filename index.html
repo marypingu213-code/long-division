@@ -228,8 +228,15 @@
         }
 
         // 引導語：「8 裡面有幾個 3？（商寫在上面）」
+        // 2位數除數估商後：配合粉紅色標示和乘法表，問「被除數去掉個位 裡面有幾個 整十數的十位」
+        // 例：398 ÷ 29，29 ≈ 30 → 「3 裡面有幾個 3？」
         function askQuotient(index) {
-            setInstruction(`${getWorkingDividendForStep(index)} 裡面有幾個 ${divisor}？（商寫在上面）`);
+            const W = getWorkingDividendForStep(index);
+            if (needsEstimate && estimateBase !== null && W >= 10) {
+                setInstruction(`${Math.floor(W / 10)} 裡面有幾個 ${estimateBase / 10}？（商寫在上面）`);
+            } else {
+                setInstruction(`${W} 裡面有幾個 ${divisor}？（商寫在上面）`);
+            }
         }
 
         function leftWidthRem() { return divisor >= 10 ? 8.5 : 3.5; }
